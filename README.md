@@ -1,2 +1,2 @@
 # atHand
-A highly customizable shortcut to everything
+A highly customizable board shows everything you need
