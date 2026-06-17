@@ -1,14 +1,6 @@
 #include <Windows.h>
-#define buttonClick 1001
-#define buttonWid   50
-#define buttonHei   40
-#define timeText    1002
-#define textWid     100
-#define textHei     80
-
 int g_seconds = 0;
 bool g_isRunning = false;
-
 
 //                          窗口句柄    消息代码     包含消息的其他数据
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
@@ -23,21 +15,58 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 
       // FillRect(hdc, &ps.rcPaint, (HBRUSH) (COLOR_WINDOW + 1));
       FillRect(hdc, &ps.rcPaint, (HBRUSH)GetStockObject(BLACK_BRUSH));
+
+      // Text color
+      SetTextColor(hdc, RGB(255, 255, 255));
+
+      // Text background mode
+      SetBkMode(hdc, TRANSPARENT);
+
+      HFONT hFont = CreateFont(
+        120,              // 字体高度（像素）
+        0,                // 字体宽度（0 表示自动按比例）
+        0, 0,             // 旋转角度（0 表示不旋转）
+        FW_BOLD,          // 粗体
+        FALSE, FALSE, FALSE, // 斜体、下划线、删除线（都不需要）
+        DEFAULT_CHARSET,  // 字符集（默认）
+        OUT_DEFAULT_PRECIS,
+        CLIP_DEFAULT_PRECIS,
+        DEFAULT_QUALITY,
+        DEFAULT_PITCH | FF_DONTCARE,
+        L"Arial"          // 字体名称
+      );
+
+      SelectObject(hdc, hFont);
+
+      wchar_t buffer[64];
+      wsprintfW(buffer, L"%d", g_seconds);
+
+      RECT rect;
+      GetClientRect(hwnd, &rect);
+
+      DrawTextW(
+        hdc,
+        buffer,
+        -1,     // the length of text
+        &rect,
+        DT_CENTER | DT_VCENTER | DT_SINGLELINE
+      );
+
+      DeleteObject(hFont);
+
       EndPaint(hwnd, &ps);
       return 0;
     }
-    case WM_COMMAND: {
-      // LOWORD(wParam) 就是按钮的 ID
-      if (LOWORD(wParam) == buttonClick) {
+    case WM_KEYDOWN: {
+      if (wParam == VK_SPACE) {
         if (!g_isRunning) {
           SetTimer(hwnd, 100, 1000, NULL);
+          //       窗口   编号 时间   函数
           g_isRunning = true;
-          SetWindowText(GetDlgItem(hwnd, buttonClick), L"Stop");
         }
         else {
           KillTimer(hwnd, 100);
           g_isRunning = false;
-          SetWindowText(GetDlgItem(hwnd, buttonClick), L"Continue");
         }
       }
       return 0;
@@ -45,33 +74,9 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
     case WM_TIMER: {
       if (wParam == 100) {
         g_seconds++;
-        wchar_t buffer[64];
-        wsprintfW(buffer, L"%d", g_seconds);
-        SetWindowText(GetDlgItem(hwnd, timeText), buffer);
+        InvalidateRect(hwnd, NULL, TRUE); // 强制重绘
+        //             窗口   区域  是否擦除旧值
       }
-
-      return 0;
-    }
-    case WM_SIZE: {
-      int wid = LOWORD(lParam);
-      int hei = HIWORD(lParam);
-
-      HWND hText = GetDlgItem(hwnd, timeText);
-      if (hText) {
-        int x = (wid - textWid) / 2;
-        int y = (hei - textHei) / 2;
-
-        MoveWindow(hText, x, y, textWid, textHei, true);
-      }
-
-      HWND hButton = GetDlgItem(hwnd, buttonClick);
-      if (hButton) {
-        int x = (wid - buttonWid) / 2;
-        int y = (hei - buttonHei) / 2 + hei / 3;
-
-        MoveWindow(hButton, x, y, buttonWid, buttonHei, true);
-      }
-
       return 0;
     }
   }
@@ -83,7 +88,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, LPWSTR lpCmdLine, int nCmdSh
   WNDCLASSW wc = {};
   wc.lpfnWndProc = WindowProc;         // 窗口过程
   wc.hInstance = hInstance;            // 窗口句柄
-  wc.lpszClassName = L"SampleWindow";  // 窗口标识
+  wc.lpszClassName = L"Catime";  // 窗口标识
   // 窗口类必须设置的结构成员
   RegisterClassW(&wc);   // 传入窗口类的地址，将窗口类注册到操作系统
     
@@ -91,7 +96,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, LPWSTR lpCmdLine, int nCmdSh
   // CreateWindowExW 创建成功会返回窗口句柄，否则返回0
   HWND hwnd = CreateWindowExW(
     WS_EX_LAYERED | WS_EX_TOPMOST,   // window style : 分层窗口 + 保持顶层
-    L"SampleWindow",                 // class : 定义要创建的窗口类型
+    L"Catime",                 // class : 定义要创建的窗口类型
     L"Clock",                        // text  : 不同窗口的text的表现形式不同
     WS_POPUP,                        // style : 提供标题栏，最小化，边框等样式
 
@@ -107,34 +112,6 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, LPWSTR lpCmdLine, int nCmdSh
   );
 
   SetLayeredWindowAttributes(hwnd, RGB(0, 0, 0), 0, LWA_COLORKEY);
-
-  HWND hButton = CreateWindowEx( 
-    2,
-    L"BUTTON",  // Predefined class; Unicode assumed 
-    L"Click",      // Button text 
-    WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,  // Styles 
-    175,         // x position 
-    200,         // y position 
-    50,        // Button width
-    40,        // Button height
-    hwnd,       // Parent window
-    (HMENU)buttonClick,       // No menu.
-    (HINSTANCE)GetWindowLongPtr(hwnd, GWLP_HINSTANCE), 
-    NULL        // Pointer not needed.
-  );      
-
-  HWND hText = CreateWindowEx(
-    0,
-    L"Static",  // Static text
-    L"0",
-    WS_CHILD | WS_VISIBLE | SS_CENTER | SS_CENTERIMAGE,
-    100, 50,
-    100, 80,
-    hwnd,
-    (HMENU)timeText, 
-    GetModuleHandle(NULL),
-    NULL
-  );
     
   // 3. 显示并更新窗口
   ShowWindow(hwnd, nCmdShow);
