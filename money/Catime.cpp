@@ -1,5 +1,8 @@
 #include <Windows.h>
-int g_seconds = 0;
+#include <stdio.h>
+LARGE_INTEGER g_freq = {0};
+LARGE_INTEGER g_st = {0};
+LONGLONG g_baseCount = 0;
 bool g_isRunning = false;
 
 //                          窗口句柄    消息代码     包含消息的其他数据
@@ -38,8 +41,17 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 
       SelectObject(hdc, hFont);
 
+      LONGLONG totalCount = g_baseCount;
+      if (g_isRunning) {
+        LARGE_INTEGER now;
+        QueryPerformanceCounter(&now);
+        totalCount += (now.QuadPart - g_st.QuadPart);
+      }
+
+      double textSeconds = (double)totalCount / g_freq.QuadPart;
+
       wchar_t buffer[64];
-      wsprintfW(buffer, L"%d", g_seconds);
+      swprintf_s(buffer, sizeof(buffer) / sizeof(wchar_t), L"%.2f", textSeconds);
 
       RECT rect;
       GetClientRect(hwnd, &rect);
@@ -59,13 +71,20 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
     }
     case WM_KEYDOWN: {
       if (wParam == VK_SPACE) {
+        LARGE_INTEGER now;
+        QueryPerformanceCounter(&now);
+
         if (!g_isRunning) {
-          SetTimer(hwnd, 100, 1000, NULL);
-          //       窗口   编号 时间   函数
+          if (g_st.QuadPart == 0) {
+            g_baseCount = 0;
+          }
+
+          g_st = now;
           g_isRunning = true;
+          InvalidateRect(hwnd, NULL, TRUE);
         }
         else {
-          KillTimer(hwnd, 100);
+          g_baseCount += (now.QuadPart - g_st.QuadPart);
           g_isRunning = false;
         }
       }
@@ -73,10 +92,13 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
     }
     case WM_TIMER: {
       if (wParam == 100) {
-        g_seconds++;
-        InvalidateRect(hwnd, NULL, TRUE); // 强制重绘
-        //             窗口   区域  是否擦除旧值
+        if (g_isRunning) InvalidateRect(hwnd, NULL, TRUE); // 强制重绘
+        //                             窗口   区域  是否擦除旧值
       }
+      return 0;
+    }
+    case WM_CREATE: {
+      SetTimer(hwnd, 100, 50, NULL);
       return 0;
     }
   }
@@ -91,6 +113,8 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, LPWSTR lpCmdLine, int nCmdSh
   wc.lpszClassName = L"Catime";  // 窗口标识
   // 窗口类必须设置的结构成员
   RegisterClassW(&wc);   // 传入窗口类的地址，将窗口类注册到操作系统
+
+  QueryPerformanceFrequency(&g_freq);
     
   // 2. 创建窗口
   // CreateWindowExW 创建成功会返回窗口句柄，否则返回0
